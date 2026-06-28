@@ -6,7 +6,7 @@
   "publisher": "your-publisher-id",
   "license": "MIT",
   "author": {
-    "name": "Your Name"
+    "name": "Oscar Rojas"
   },
   "icon": "assets/icon.png",
   "engines": {
@@ -14,12 +14,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-username/click-to-source.git"
+    "url": "https://github.com/rx3card/click-to-source.git"
   },
   "bugs": {
-    "url": "https://github.com/your-username/click-to-source/issues"
+    "url": "https://github.com/rx3card/click-to-source/issues"
   },
-  "homepage": "https://github.com/your-username/click-to-source#readme",
+  "homepage": "https://github.com/rx3card/click-to-source#readme",
   "keywords": [
     "react",
     "nextjs",
