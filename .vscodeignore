@@ -6,6 +6,7 @@ docs/**
 examples/**
 src/**
 assets/screenshots/**
+assets/*.gif
 node_modules/**
 **/tsconfig.json
 **/*.map

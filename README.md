@@ -7,7 +7,9 @@ It works with component-based and template-based apps alike. React, Next.js and 
 are confirmed working today; other stacks may work through the same strategies. If you
 can open it on a local dev server, you can try it.
 
-> Demo video coming soon.
+<p align="center">
+  <img src="https://raw.githubusercontent.com/rx3card/click-to-source/main/assets/demo.gif" alt="Click to Source demo: turning on the selector, clicking an element in the running app, and VS Code jumping to its source code" width="820" />
+</p>
 
 ---
 
