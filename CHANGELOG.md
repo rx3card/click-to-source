@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project uses
 [semantic versioning](https://semver.org/).
 
+## [0.1.1] - 2026-06-28
+
+### Added
+- A clear "no server running" message in the panel when nothing answers at the
+  configured URL, with a Retry button, instead of a blank white screen.
+
 ## [0.1.0] - 2026-06-28
 
 The first working release.

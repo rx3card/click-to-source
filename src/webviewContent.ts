@@ -50,6 +50,15 @@ export function getWebviewHtml(
     #status:empty { display: none; }
     #frameWrap { flex: 1 1 auto; position: relative; min-height: 0; }
     iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: none; background: #fff; }
+    #empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      padding: 24px; text-align: center; background: var(--vscode-editor-background); }
+    #empty[hidden] { display: none; }
+    .empty-card { max-width: 400px; }
+    .empty-card h2 { margin: 0 0 10px; font-size: 20px; }
+    .empty-card p { margin: 6px 0; font-size: 13px; line-height: 1.5; opacity: 0.85; }
+    .empty-card .hint { opacity: 0.6; }
+    .empty-card code { background: var(--vscode-textCodeBlock-background); padding: 1px 5px; border-radius: 4px; }
+    #retry { margin-top: 14px; }
   </style>
 </head>
 <body>
@@ -60,7 +69,15 @@ export function getWebviewHtml(
     <span id="status"></span>
   </div>
   <div id="frameWrap">
-    <iframe id="app" src="${devUrl}"></iframe>
+    <iframe id="app" src="about:blank"></iframe>
+    <div id="empty" hidden>
+      <div class="empty-card">
+        <h2>Oops!</h2>
+        <p id="empty-msg"></p>
+        <p class="hint">Start your dev server, then press Retry.</p>
+        <button id="retry">Retry</button>
+      </div>
+    </div>
   </div>
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>

@@ -1,5 +1,6 @@
 // @ts-check
-// Panel script (host). Bridges the app iframe and the extension.
+// Panel script (host). Bridges the app iframe and the extension, and shows a
+// friendly message when no dev server is running at the given URL.
 (function () {
   const vscode = acquireVsCodeApi();
 
@@ -8,6 +9,9 @@
   const reloadBtn = /** @type {HTMLButtonElement} */ (document.getElementById('reload'));
   const statusEl = /** @type {HTMLElement} */ (document.getElementById('status'));
   const iframe = /** @type {HTMLIFrameElement} */ (document.getElementById('app'));
+  const emptyEl = /** @type {HTMLElement} */ (document.getElementById('empty'));
+  const emptyMsg = /** @type {HTMLElement} */ (document.getElementById('empty-msg'));
+  const retryBtn = /** @type {HTMLButtonElement} */ (document.getElementById('retry'));
 
   let inspecting = false;
 
@@ -29,15 +33,65 @@
     setStatus(value ? 'Hover and click an element...' : '');
   }
 
+  function portOf(url) {
+    try {
+      const u = new URL(url);
+      return u.port || (u.protocol === 'https:' ? '443' : '80');
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function showEmpty(url) {
+    const port = portOf(url);
+    emptyMsg.textContent =
+      "It looks like there's no server running at " +
+      url +
+      (port ? ' (port ' + port + ')' : '') +
+      '. Make sure your app is started and the URL is correct.';
+    emptyEl.hidden = false;
+  }
+
+  function hideEmpty() {
+    emptyEl.hidden = true;
+  }
+
+  // Checks whether a server answers at the URL, then loads it (or shows the
+  // empty state). A no-cors fetch resolves if the server responds and rejects
+  // on a connection error, which is exactly what we need to detect.
+  function loadUrl(url) {
+    if (!url) {
+      return;
+    }
+    setStatus('Connecting to ' + url + '...');
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4000);
+
+    fetch(url, { mode: 'no-cors', signal: controller.signal })
+      .then(() => {
+        clearTimeout(timer);
+        hideEmpty();
+        // Force a reload even if the URL is unchanged.
+        iframe.src = 'about:blank';
+        setTimeout(() => {
+          iframe.src = url;
+        }, 0);
+        setStatus('');
+      })
+      .catch(() => {
+        clearTimeout(timer);
+        iframe.src = 'about:blank';
+        showEmpty(url);
+        setStatus('');
+      });
+  }
+
   toggleBtn.addEventListener('click', () => setInspecting(!inspecting));
-
-  reloadBtn.addEventListener('click', () => {
-    iframe.src = urlInput.value;
-  });
-
+  reloadBtn.addEventListener('click', () => loadUrl(urlInput.value.trim()));
+  retryBtn.addEventListener('click', () => loadUrl(urlInput.value.trim()));
   urlInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
-      iframe.src = urlInput.value;
+      loadUrl(urlInput.value.trim());
     }
   });
 
@@ -58,5 +112,6 @@
     }
   });
 
-  setStatus('Panel ready. Turn on the selector once your app loads.');
+  // Initial load: check the configured URL.
+  loadUrl(urlInput.value.trim());
 })();
