@@ -1,12 +1,12 @@
 # pnpm 11 keeps these settings here (no longer in package.json's "pnpm" field).
 #
-# esbuild ships a prebuilt binary, so allow its install script to run cleanly.
+# esbuild ships a prebuilt binary, so its build script is allowed to run cleanly.
 # keytar and @vscode/vsce-sign are only used by `vsce` for credential storage at
-# publish time; their native build scripts are not needed to package or build, so
-# they are intentionally left unbuilt (pnpm may print a harmless notice about them).
+# publish time; building them is not needed to compile or package, so pnpm may
+# print a harmless "ignored build scripts" notice for them. That notice does not
+# fail the install.
 onlyBuiltDependencies:
   - esbuild
 
-# Skip pnpm's pre-run dependency check so `pnpm run <script>` stays fast and does
-# not error on pending optional build scripts. npm users are unaffected by this file.
+# Skip pnpm's pre-run dependency check so `pnpm run <script>` stays fast.
 verifyDepsBeforeRun: false
