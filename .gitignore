@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# Build output
+out/
+
+# Packaged extensions
+*.vsix
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+
+# Tooling artifacts
+.playwright-mcp/

@@ -1,0 +1,16 @@
+# Source and tooling that the published extension does not need.
+.github/**
+.vscode/**
+docs/**
+examples/**
+src/**
+assets/screenshots/**
+**/tsconfig.json
+**/*.map
+.gitignore
+.editorconfig
+.playwright-mcp/**
+*.vsix
+
+# Keep in the package: out/, media/, assets/icon.png, README, CHANGELOG, LICENSE,
+# and the production dependency source-map (vsce includes prod deps automatically).

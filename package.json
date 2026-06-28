@@ -1,0 +1,78 @@
+{
+  "name": "click-to-source",
+  "displayName": "Click to Source",
+  "description": "Preview your running app inside VS Code, click any element, and jump straight to its source code. Works with React/Next, plain HTML/CSS, and server-rendered templates (Flask, Django, PHP, and more).",
+  "version": "0.1.0",
+  "publisher": "your-publisher-id",
+  "license": "MIT",
+  "author": {
+    "name": "Your Name"
+  },
+  "icon": "assets/icon.png",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/click-to-source.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-username/click-to-source/issues"
+  },
+  "homepage": "https://github.com/your-username/click-to-source#readme",
+  "keywords": [
+    "react",
+    "nextjs",
+    "inspector",
+    "source",
+    "devtools",
+    "dom",
+    "jsx",
+    "vue",
+    "html"
+  ],
+  "categories": [
+    "Other",
+    "Visualization"
+  ],
+  "galleryBanner": {
+    "color": "#1E1E2E",
+    "theme": "dark"
+  },
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "clickToSource.open",
+        "title": "Open Panel",
+        "category": "Click to Source"
+      }
+    ],
+    "configuration": {
+      "title": "Click to Source",
+      "properties": {
+        "clickToSource.devServerUrl": {
+          "type": "string",
+          "default": "http://localhost:3000",
+          "description": "URL of your local dev server (e.g. http://localhost:3000)."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "devDependencies": {
+    "@types/node": "^20.x",
+    "@types/vscode": "^1.75.0",
+    "typescript": "^5.x"
+  },
+  "dependencies": {
+    "source-map": "^0.6.1"
+  }
+}
