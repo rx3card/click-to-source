@@ -95,6 +95,13 @@
     }
   });
 
+  // Whenever the page finishes loading (first load, Reload, or in-app
+  // navigation), push the current selector state so it stays in sync without
+  // the user having to reload manually.
+  iframe.addEventListener('load', () => {
+    postToApp({ source: 'click-to-source-host', type: 'toggle', enabled: inspecting });
+  });
+
   // Messages coming from the client script inside the iframe (your app).
   window.addEventListener('message', (event) => {
     const data = event.data;

@@ -10,6 +10,10 @@ All notable changes to this project are documented here. The format follows
 - A clear "no server running" message in the panel when nothing answers at the
   configured URL, with a Retry button, instead of a blank white screen.
 
+### Fixed
+- The selector now stays in sync after the page (re)loads, so toggling it on or
+  off applies immediately without needing a manual reload.
+
 ## [0.1.0] - 2026-06-28
 
 The first working release.
