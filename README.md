@@ -3,11 +3,40 @@
 Preview your running app inside VS Code, click any element, and jump straight to the
 code that renders it. No switching to the browser, no hunting through files.
 
-It was built for **React / Next.js**, and it also does its best with **plain HTML/CSS**
-and **server-rendered templates** (Flask, Django, PHP, EJS, Handlebars, and more). If
-you can open it on a local dev server, you can inspect it.
+It works with component-based and template-based apps alike. React, Next.js and Astro
+are confirmed working today; other stacks may work through the same strategies. If you
+can open it on a local dev server, you can try it.
 
-> Add a screenshot or short GIF here once you have one - see `assets/screenshots/`.
+> Demo video coming soon.
+
+---
+
+## Supported frameworks
+
+The goal is to support every framework. This is where things stand today.
+
+**Verified** - tested and working (React/Next open the exact line; Astro opens the
+right file by best match):
+
+![React](https://img.shields.io/badge/React-Verified-2ea44f?style=for-the-badge&logo=react&logoColor=white)
+![Next.js](https://img.shields.io/badge/Next.js-Verified-2ea44f?style=for-the-badge&logo=nextdotjs&logoColor=white)
+![Astro](https://img.shields.io/badge/Astro-Verified-2ea44f?style=for-the-badge&logo=astro&logoColor=white)
+
+**Supported** - the strategy is implemented and usually works (exact line not guaranteed):
+
+![Vue](https://img.shields.io/badge/Vue-Supported-2f74c0?style=for-the-badge&logo=vuedotjs&logoColor=white)
+![HTML/CSS](https://img.shields.io/badge/HTML%2FCSS-Supported-2f74c0?style=for-the-badge&logo=html5&logoColor=white)
+![Server-rendered](https://img.shields.io/badge/Server--rendered-Best--effort-d4a017?style=for-the-badge&logo=django&logoColor=white)
+
+Server-rendered covers template engines such as Flask, Django, PHP, EJS and Handlebars,
+located by `id`, a distinctive class, or visible text.
+
+Projects that use a source-attribute plugin (Locator JS, react-dev-inspector) are
+detected automatically, on any framework.
+
+Don't see your stack, or found one that doesn't work? Open an
+[issue](https://github.com/rx3card/click-to-source/issues) - the plan is to expand and
+verify more frameworks over time.
 
 ---
 
