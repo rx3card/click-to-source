@@ -56,6 +56,16 @@ export function activate(context: vscode.ExtensionContext) {
   });
 
   context.subscriptions.push(openCmd);
+
+  // A clickable item in the status bar so the panel is one click away, with no
+  // need to go through the Command Palette. Status bar icons are monochrome and
+  // follow the theme, so we use a built-in codicon that matches the others.
+  const statusItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+  statusItem.text = '$(target) Click to Source';
+  statusItem.tooltip = 'Open the Click to Source panel';
+  statusItem.command = 'clickToSource.open';
+  statusItem.show();
+  context.subscriptions.push(statusItem);
 }
 
 /** Tries each candidate strategy in order; opens the first that resolves. */

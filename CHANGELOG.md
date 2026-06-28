@@ -10,6 +10,7 @@ The first working release.
 
 ### Added
 - A panel that embeds your running dev server inside VS Code.
+- A status bar button to open the panel in one click, without the Command Palette.
 - An element selector: hover to highlight, click to jump to the source file.
 - React / Next.js support (React 19) by reading debug stacks and resolving them
   through Turbopack and webpack source maps to the original `.tsx`/`.jsx` line.

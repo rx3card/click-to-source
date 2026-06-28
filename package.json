@@ -39,7 +39,9 @@
     "color": "#1E1E2E",
     "theme": "dark"
   },
-  "activationEvents": [],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
@@ -71,6 +73,7 @@
   "devDependencies": {
     "@types/node": "^20.x",
     "@types/vscode": "^1.75.0",
+    "@vscode/vsce": "^3.9.2",
     "esbuild": "^0.28.1",
     "typescript": "^5.x"
   },
