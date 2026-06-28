@@ -122,6 +122,24 @@ click-to-source/
 
 ---
 
+## Contributing
+
+Contributions are very welcome. This is an open project and it gets better with more
+eyes on it.
+
+- **Found a bug?** Please don't hesitate to open an issue and tell us about it. Include
+  what you did, what you expected, and what happened instead. We'll do our best to look
+  into it and get it fixed. Open one here:
+  [github.com/rx3card/click-to-source/issues](https://github.com/rx3card/click-to-source/issues)
+- **Have an idea or an improvement?** Open an issue to discuss it, or send a pull
+  request directly.
+- **Want to help with the code?** See [CONTRIBUTING.md](CONTRIBUTING.md) for how to get
+  set up and run the extension locally.
+
+No contribution is too small. Even reporting a typo helps.
+
+---
+
 ## License
 
 [MIT License](LICENSE).
