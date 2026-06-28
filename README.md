@@ -8,7 +8,7 @@ are confirmed working today; other stacks may work through the same strategies. 
 can open it on a local dev server, you can try it.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/rx3card/click-to-source/main/assets/demo.gif" alt="Click to Source demo: turning on the selector, clicking an element in the running app, and VS Code jumping to its source code" width="820" />
+  <img src="https://raw.githubusercontent.com/rx3card/click-to-source/main/assets/demo.gif?v=2" alt="Click to Source demo: turning on the selector, clicking an element in the running app, and VS Code jumping to its source code" width="820" />
 </p>
 
 ---
