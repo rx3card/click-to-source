@@ -64,7 +64,8 @@ feels heavier than it is - you do it once and never again.
 ### 1. Install the publishing tool
 
 ```bash
-npm install -g @vscode/vsce
+pnpm add -g @vscode/vsce
+# or, if you don't use pnpm: npm install -g @vscode/vsce
 ```
 
 `vsce` ("Visual Studio Code Extensions") is the official command-line tool that
@@ -108,17 +109,20 @@ Now update `package.json` so `"publisher"` matches that id.
 vsce login your-publisher-id
 # paste the PAT when asked
 
-vsce publish
+pnpm run publish
 ```
 
-`vsce publish` compiles, packages, and uploads in one step. Within a few minutes the
-extension appears on the Marketplace and is installable from inside VS Code.
+`pnpm run publish` builds, packages, and uploads in one step. (It runs
+`vsce publish --no-dependencies`; the `--no-dependencies` flag is needed because the
+extension is bundled with esbuild, so it carries its dependency inside the build and
+does not ship node_modules.) Within a few minutes the extension appears on the
+Marketplace and is installable from inside VS Code.
 
 To release a new version later, bump the version and publish again:
 
 ```bash
-vsce publish patch   # 0.1.0 -> 0.1.1
-vsce publish minor   # 0.1.0 -> 0.2.0
+vsce publish patch --no-dependencies   # 0.1.0 -> 0.1.1
+vsce publish minor --no-dependencies   # 0.1.0 -> 0.2.0
 ```
 
 ---
@@ -128,7 +132,7 @@ vsce publish minor   # 0.1.0 -> 0.2.0
 If you just want to hand the extension to someone, package it and send the file:
 
 ```bash
-vsce package
+pnpm run package
 ```
 
 This produces a `click-to-source-0.1.0.vsix`. They install it with

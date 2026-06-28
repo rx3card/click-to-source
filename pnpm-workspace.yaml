@@ -1,0 +1,7 @@
+# pnpm 11 keeps these settings here (no longer in package.json's "pnpm" field).
+# esbuild ships a prebuilt binary; allow its install script so installs are clean.
+onlyBuiltDependencies:
+  - esbuild
+# Skip pnpm's pre-run dependency check so `pnpm run <script>` stays fast and does
+# not error on the esbuild build prompt. npm users are unaffected by this file.
+verifyDepsBeforeRun: false

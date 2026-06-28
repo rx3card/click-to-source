@@ -1,16 +1,20 @@
-# Source and tooling that the published extension does not need.
+# The published extension only needs out/extension.js, the media scripts, the icon,
+# and the manifest/readme/license. Everything else is source or tooling.
 .github/**
 .vscode/**
 docs/**
 examples/**
 src/**
 assets/screenshots/**
+node_modules/**
 **/tsconfig.json
 **/*.map
+esbuild.js
+pnpm-workspace.yaml
+pnpm-lock.yaml
+.npmrc
 .gitignore
+.gitattributes
 .editorconfig
 .playwright-mcp/**
 *.vsix
-
-# Keep in the package: out/, media/, assets/icon.png, README, CHANGELOG, LICENSE,
-# and the production dependency source-map (vsce includes prod deps automatically).
