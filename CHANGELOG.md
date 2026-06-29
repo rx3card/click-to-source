@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project uses
 [semantic versioning](https://semver.org/).
 
+## [0.2.0] - 2026-06-28
+
+### Added
+- A built-in local proxy (on by default, `clickToSource.proxy`) so any project
+  works inside the panel with no setup:
+  - It rewrites session cookies to SameSite=None; Secure, so logging in inside
+    the panel persists instead of kicking you back to the login page.
+  - It injects the inspector client into HTML automatically, so you no longer
+    have to copy a script into each project.
+- An "Open in browser" button in the panel toolbar, useful as a fallback for
+  pages behind a login.
+
 ## [0.1.1] - 2026-06-28
 
 ### Added

@@ -6,12 +6,14 @@ import * as vscode from 'vscode';
 export function getWebviewHtml(
   webview: vscode.Webview,
   extensionUri: vscode.Uri,
-  devUrl: string
+  devUrl: string,
+  proxyUrl: string
 ): string {
   const nonce = getNonce();
   const scriptUri = webview.asWebviewUri(
     vscode.Uri.joinPath(extensionUri, 'media', 'webview.js')
   );
+  const config = JSON.stringify({ proxyUrl });
 
   const csp = [
     `default-src 'none'`,
@@ -65,6 +67,7 @@ export function getWebviewHtml(
   <div id="toolbar">
     <button id="toggle" title="Toggle the element selector">Selector: OFF</button>
     <button id="reload" title="Reload the page">Reload</button>
+    <button id="openExternal" title="Open this URL in your default browser (useful for pages behind a login)">Open in browser</button>
     <input id="url" value="${devUrl}" placeholder="http://localhost:3000" />
     <span id="status"></span>
   </div>
@@ -79,6 +82,7 @@ export function getWebviewHtml(
       </div>
     </div>
   </div>
+  <script nonce="${nonce}">window.__CTS = ${config};</script>
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;

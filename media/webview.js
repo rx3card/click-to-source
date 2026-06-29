@@ -3,10 +3,14 @@
 // friendly message when no dev server is running at the given URL.
 (function () {
   const vscode = acquireVsCodeApi();
+  // When the proxy is on, the iframe loads it (and it forwards to your dev
+  // server, rewriting cookies and injecting the client). Empty = no proxy.
+  const PROXY_URL = (window.__CTS && window.__CTS.proxyUrl) || '';
 
   const toggleBtn = /** @type {HTMLButtonElement} */ (document.getElementById('toggle'));
   const urlInput = /** @type {HTMLInputElement} */ (document.getElementById('url'));
   const reloadBtn = /** @type {HTMLButtonElement} */ (document.getElementById('reload'));
+  const openExternalBtn = /** @type {HTMLButtonElement} */ (document.getElementById('openExternal'));
   const statusEl = /** @type {HTMLElement} */ (document.getElementById('status'));
   const iframe = /** @type {HTMLIFrameElement} */ (document.getElementById('app'));
   const emptyEl = /** @type {HTMLElement} */ (document.getElementById('empty'));
@@ -63,6 +67,12 @@
     if (!url) {
       return;
     }
+    // Point the proxy at this target (no-op when the proxy is off).
+    vscode.postMessage({ type: 'setTarget', url: url });
+    // The iframe loads the proxy (which forwards to the target); without a
+    // proxy it loads the target directly.
+    const frameUrl = PROXY_URL || url;
+
     setStatus('Connecting to ' + url + '...');
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 4000);
@@ -74,7 +84,7 @@
         // Force a reload even if the URL is unchanged.
         iframe.src = 'about:blank';
         setTimeout(() => {
-          iframe.src = url;
+          iframe.src = frameUrl;
         }, 0);
         setStatus('');
       })
@@ -88,6 +98,9 @@
 
   toggleBtn.addEventListener('click', () => setInspecting(!inspecting));
   reloadBtn.addEventListener('click', () => loadUrl(urlInput.value.trim()));
+  openExternalBtn.addEventListener('click', () => {
+    vscode.postMessage({ type: 'openExternal', url: urlInput.value.trim() });
+  });
   retryBtn.addEventListener('click', () => loadUrl(urlInput.value.trim()));
   urlInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
