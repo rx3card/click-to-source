@@ -2,7 +2,7 @@
   "name": "click-to-source",
   "displayName": "Click to Source",
   "description": "Preview your running app inside VS Code, click any element, and jump straight to its source code. Works with React/Next, plain HTML/CSS, and server-rendered templates (Flask, Django, PHP, and more).",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "publisher": "rx3card",
   "license": "MIT",
   "author": {

@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project uses
 [semantic versioning](https://semver.org/).
 
+## [0.2.3] - 2026-06-28
+
+### Fixed
+- Guard the injected-client route too, so an aborted request during a panel
+  reload can never throw "Cannot set headers after they are sent".
+
 ## [0.2.2] - 2026-06-28
 
 ### Fixed

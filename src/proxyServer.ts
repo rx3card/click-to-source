@@ -128,11 +128,20 @@ export async function startProxy(
 
   const server = http.createServer((req, res) => {
     if (req.url === CLIENT_PATH) {
-      res.writeHead(200, {
-        'content-type': 'application/javascript; charset=utf-8',
-        'cache-control': 'no-store'
-      });
-      res.end(clientScript);
+      // The browser can abort this while the panel reloads; never let a write
+      // on a dead response throw "Cannot set headers after they are sent".
+      if (res.headersSent || res.writableEnded || res.destroyed) {
+        return;
+      }
+      try {
+        res.writeHead(200, {
+          'content-type': 'application/javascript; charset=utf-8',
+          'cache-control': 'no-store'
+        });
+        res.end(clientScript);
+      } catch {
+        /* response already gone */
+      }
       return;
     }
     proxy.web(req, res, { target });
