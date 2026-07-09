@@ -46,6 +46,12 @@ export async function startProxy(
   proxy.on('proxyRes', (proxyRes, _req, res) => {
     const headers: http.OutgoingHttpHeaders = { ...proxyRes.headers };
 
+    // The upstream body is already de-chunked by Node's HTTP client, so we must
+    // never forward the upstream transfer-encoding. Node re-applies framing on
+    // its own when we pipe or send a buffer. Keeping it corrupts JS/CSS chunks
+    // and leaves the page blank.
+    delete headers['transfer-encoding'];
+
     // 1) Keep session cookies alive inside the cross-origin iframe.
     const setCookie = proxyRes.headers['set-cookie'];
     if (setCookie) {

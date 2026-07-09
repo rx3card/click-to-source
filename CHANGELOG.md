@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project uses
 [semantic versioning](https://semver.org/).
 
+## [0.2.1] - 2026-06-28
+
+### Fixed
+- Blank page when the proxy was on: the upstream `transfer-encoding: chunked`
+  header was forwarded on already-decoded JS/CSS responses, corrupting them.
+  The header is now dropped so assets load correctly.
+
 ## [0.2.0] - 2026-06-28
 
 ### Added
