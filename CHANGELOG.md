@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project uses
 [semantic versioning](https://semver.org/).
 
+## [0.2.4] - 2026-06-28
+
+### Changed
+- The cookie/injection proxy is now OFF by default. The panel loads your dev
+  server directly (the most reliable path, like earlier versions). Enable
+  clickToSource.proxy only if you need to stay logged in inside the panel.
+
 ## [0.2.3] - 2026-06-28
 
 ### Fixed
