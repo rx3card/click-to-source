@@ -64,17 +64,35 @@ export async function startProxy(
       headers['location'] = location.split(target).join(proxyOrigin);
     }
 
+    // The browser often aborts requests when the panel reloads. Guard every
+    // write so a dead response never throws "Cannot set headers after sent".
+    const writable = () => !res.headersSent && !res.writableEnded && !res.destroyed;
+
     const contentType = String(proxyRes.headers['content-type'] || '');
     if (!contentType.includes('text/html')) {
-      res.writeHead(proxyRes.statusCode || 200, headers);
-      proxyRes.pipe(res);
+      if (!writable()) {
+        proxyRes.destroy();
+        return;
+      }
+      try {
+        res.writeHead(proxyRes.statusCode || 200, headers);
+        proxyRes.pipe(res);
+      } catch {
+        proxyRes.destroy();
+      }
       return;
     }
 
     // 3) HTML: buffer, inject the client script, resend.
     const chunks: Buffer[] = [];
     proxyRes.on('data', (chunk) => chunks.push(chunk as Buffer));
+    proxyRes.on('error', () => {
+      /* upstream aborted; nothing to send */
+    });
     proxyRes.on('end', () => {
+      if (!writable()) {
+        return;
+      }
       let body = Buffer.concat(chunks).toString('utf8');
       const tag = `<script src="${CLIENT_PATH}"></script>`;
       if (body.includes('</body>')) {
@@ -83,19 +101,22 @@ export async function startProxy(
         body += tag;
       }
       const buf = Buffer.from(body, 'utf8');
-      // We send a full buffer, so replace any streaming/length headers from the
-      // upstream. Keeping both transfer-encoding and content-length is invalid.
+      // We send a full buffer, so replace any streaming/length headers.
       delete headers['transfer-encoding'];
       delete headers['content-length'];
       headers['content-length'] = String(buf.length);
-      res.writeHead(proxyRes.statusCode || 200, headers);
-      res.end(buf);
+      try {
+        res.writeHead(proxyRes.statusCode || 200, headers);
+        res.end(buf);
+      } catch {
+        /* response already gone */
+      }
     });
   });
 
   proxy.on('error', (_err, _req, res) => {
     const r = res as http.ServerResponse;
-    if (r && typeof r.writeHead === 'function' && !r.headersSent) {
+    if (r && typeof r.writeHead === 'function' && !r.headersSent && !r.writableEnded && !r.destroyed) {
       try {
         r.writeHead(502, { 'content-type': 'text/plain' });
         r.end('Click to Source proxy: the dev server did not respond.');

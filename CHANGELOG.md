@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project uses
 [semantic versioning](https://semver.org/).
 
+## [0.2.2] - 2026-06-28
+
+### Fixed
+- No more "Cannot set headers after they are sent" errors: proxy responses are
+  now guarded so aborted requests (from panel reloads) never crash the handler.
+
 ## [0.2.1] - 2026-06-28
 
 ### Fixed
