@@ -4,6 +4,33 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project uses
 [semantic versioning](https://semver.org/).
 
+## [0.2.5] - 2026-07-31
+
+### Fixed
+- Blank panel with Next.js (and any app that sends security headers): the proxy
+  now removes `X-Frame-Options` and the CSP `frame-ancestors` directive, which
+  made the browser silently refuse to render the page inside the panel's
+  iframe. The rest of the app's CSP is preserved.
+- Next.js 15/16 dev-origin protection: the proxy rewrites `Origin` and
+  `Referer` to the dev server's own origin, so `/_next/*` assets and hot-reload
+  requests are no longer rejected (no `allowedDevOrigins` config needed).
+- HTML responses that arrive compressed (gzip/deflate/brotli) are now
+  decompressed before the inspector client is injected, instead of being
+  corrupted.
+- The injected client script now reuses the page's CSP nonce when one exists,
+  so strict `script-src` policies do not block it.
+- HTTPS dev servers with self-signed certificates are accepted.
+
+### Changed
+- The proxy is ON by default again. It is the piece that makes the preview
+  render everywhere; without it, apps with anti-framing headers show a blank
+  panel. Direct loading remains the automatic fallback if the proxy cannot
+  start.
+- When no server answers, the panel now retries quietly every few seconds and
+  loads the app as soon as it comes up - no clicks needed.
+- If the selector is toggled on but the inspector client is not present (proxy
+  disabled), the panel now says so instead of doing nothing.
+
 ## [0.2.4] - 2026-06-28
 
 ### Changed

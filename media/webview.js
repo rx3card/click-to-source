@@ -18,6 +18,9 @@
   const retryBtn = /** @type {HTMLButtonElement} */ (document.getElementById('retry'));
 
   let inspecting = false;
+  let clientReady = false;
+  let clientHintTimer = null;
+  let retryTimer = null;
 
   function setStatus(text) {
     statusEl.textContent = text;
@@ -35,6 +38,17 @@
     toggleBtn.classList.toggle('active', value);
     postToApp({ source: 'click-to-source-host', type: 'toggle', enabled: value });
     setStatus(value ? 'Hover and click an element...' : '');
+
+    // If the client script never announced itself, clicking would silently do
+    // nothing; tell the user what is going on instead.
+    clearTimeout(clientHintTimer);
+    if (value && !clientReady) {
+      clientHintTimer = setTimeout(() => {
+        if (inspecting && !clientReady) {
+          setStatus('Selector needs the inspector client. Enable the clickToSource.proxy setting, then Reload.');
+        }
+      }, 1500);
+    }
   }
 
   function portOf(url) {
@@ -63,17 +77,20 @@
   // Checks whether a server answers at the URL, then loads it (or shows the
   // empty state). A no-cors fetch resolves if the server responds and rejects
   // on a connection error, which is exactly what we need to detect.
-  function loadUrl(url) {
+  function loadUrl(url, silent) {
     if (!url) {
       return;
     }
+    clearTimeout(retryTimer);
     // Point the proxy at this target (no-op when the proxy is off).
     vscode.postMessage({ type: 'setTarget', url: url });
     // The iframe loads the proxy (which forwards to the target); without a
     // proxy it loads the target directly.
     const frameUrl = PROXY_URL || url;
 
-    setStatus('Connecting to ' + url + '...');
+    if (!silent) {
+      setStatus('Connecting to ' + url + '...');
+    }
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 4000);
 
@@ -93,6 +110,9 @@
         iframe.src = 'about:blank';
         showEmpty(url);
         setStatus('');
+        // Keep checking quietly and load as soon as the server comes up, so
+        // "start the app, see it appear" needs no clicks.
+        retryTimer = setTimeout(() => loadUrl(url, true), 3000);
       });
   }
 
@@ -112,6 +132,7 @@
   // navigation), push the current selector state so it stays in sync without
   // the user having to reload manually.
   iframe.addEventListener('load', () => {
+    clientReady = false;
     postToApp({ source: 'click-to-source-host', type: 'toggle', enabled: inspecting });
   });
 
@@ -127,6 +148,7 @@
       const label = data.payload && data.payload.meta && (data.payload.meta.label || data.payload.meta.tag);
       setStatus(label ? 'Opening ' + label : 'Opening...');
     } else if (data.type === 'ready') {
+      clientReady = true;
       setStatus('Client connected');
       postToApp({ source: 'click-to-source-host', type: 'toggle', enabled: inspecting });
     }

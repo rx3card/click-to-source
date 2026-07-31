@@ -2,7 +2,7 @@
   "name": "click-to-source",
   "displayName": "Click to Source",
   "description": "Preview your running app inside VS Code, click any element, and jump straight to its source code. Works with React/Next, plain HTML/CSS, and server-rendered templates (Flask, Django, PHP, and more).",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "publisher": "rx3card",
   "license": "MIT",
   "author": {
@@ -61,8 +61,8 @@
         },
         "clickToSource.proxy": {
           "type": "boolean",
-          "default": false,
-          "description": "Route the preview through a local proxy that keeps session cookies working inside the panel and auto-injects the inspector client. Off by default: the panel loads your dev server directly, which is the most reliable. Turn it on only if you need to stay logged in inside the panel."
+          "default": true,
+          "description": "Route the preview through a local proxy. The proxy removes anti-framing headers (X-Frame-Options / CSP frame-ancestors) that would otherwise leave the panel blank, keeps session cookies working, and auto-injects the inspector client into any project. Turn it off only if you inject the client script yourself."
         }
       }
     }

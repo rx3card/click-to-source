@@ -21,9 +21,10 @@ export function activate(context: vscode.ExtensionContext) {
     const devUrl = config.get<string>('devServerUrl', 'http://localhost:3000');
     const useProxy = config.get<boolean>('proxy', true);
 
-    // The proxy keeps session cookies alive and auto-injects the client script,
-    // so any project works with no setup. If it can't start, fall back to
-    // loading the dev server directly.
+    // The proxy is what makes the preview work everywhere: it removes the
+    // anti-framing headers that would otherwise blank the iframe, keeps session
+    // cookies alive, and auto-injects the client script. If it can't start,
+    // fall back to loading the dev server directly.
     let proxy: ProxyHandle | undefined;
     if (useProxy) {
       try {

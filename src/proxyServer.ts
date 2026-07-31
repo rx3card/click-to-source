@@ -3,17 +3,25 @@
 // It exists to make the in-VS-Code preview behave like a normal browser tab for
 // any project, with zero per-project setup:
 //
-//   1. Cookies: the panel embeds your app in a cross-origin iframe, where the
+//   1. Framing: many apps (and most Next.js starters with security headers) send
+//      X-Frame-Options or a CSP with frame-ancestors, which makes the browser
+//      silently refuse to render the page inside the panel's iframe. The proxy
+//      removes those directives so the preview always renders.
+//   2. Cookies: the panel embeds your app in a cross-origin iframe, where the
 //      browser treats SameSite=Strict/Lax session cookies as third-party and
 //      drops them (logging you out). The proxy rewrites every Set-Cookie to
 //      SameSite=None; Secure so the session survives.
-//   2. Client script: it injects the inspector client into every HTML response,
+//   3. Origin checks: Next.js 15+ blocks /_next/* requests whose Origin does not
+//      match the dev server (allowedDevOrigins). The proxy rewrites Origin and
+//      Referer so the dev server sees itself as the caller.
+//   4. Client script: it injects the inspector client into every HTML response,
 //      so you don't have to copy any file into your project.
 //
 // The iframe loads this proxy; the proxy forwards to your real dev server.
 
 import * as http from 'http';
 import * as fs from 'fs';
+import * as zlib from 'zlib';
 import httpProxy from 'http-proxy';
 
 export interface ProxyHandle {
@@ -35,13 +43,25 @@ export async function startProxy(
   const proxy = httpProxy.createProxyServer({
     changeOrigin: true,
     ws: true,
+    // Dev servers often run https with self-signed certs; never fail on that.
+    secure: false,
     selfHandleResponse: true
   });
 
-  // Ask the dev server for uncompressed responses so we can inject into HTML.
-  proxy.on('proxyReq', (proxyReq) => {
+  // The dev server must see itself as the caller: Next.js 15+ rejects /_next/*
+  // requests from unknown origins, and CSRF checks compare Origin/Referer
+  // against Host. Also ask for an uncompressed body so HTML can be injected.
+  const rewriteRequest = (proxyReq: http.ClientRequest) => {
     proxyReq.setHeader('accept-encoding', 'identity');
-  });
+    for (const name of ['origin', 'referer'] as const) {
+      const value = proxyReq.getHeader(name);
+      if (typeof value === 'string' && proxyOrigin && value.startsWith(proxyOrigin)) {
+        proxyReq.setHeader(name, value.replace(proxyOrigin, target));
+      }
+    }
+  };
+  proxy.on('proxyReq', rewriteRequest);
+  proxy.on('proxyReqWs', rewriteRequest);
 
   proxy.on('proxyRes', (proxyRes, _req, res) => {
     const headers: http.OutgoingHttpHeaders = { ...proxyRes.headers };
@@ -52,13 +72,30 @@ export async function startProxy(
     // and leaves the page blank.
     delete headers['transfer-encoding'];
 
-    // 1) Keep session cookies alive inside the cross-origin iframe.
+    // 1) Let the page render inside the panel's iframe. Without this, apps that
+    // send X-Frame-Options or CSP frame-ancestors show up as a blank frame.
+    delete headers['x-frame-options'];
+    for (const name of ['content-security-policy', 'content-security-policy-report-only']) {
+      const csp = headers[name];
+      if (typeof csp === 'string') {
+        const sanitized = stripFrameAncestors(csp);
+        if (sanitized) {
+          headers[name] = sanitized;
+        } else {
+          delete headers[name];
+        }
+      } else if (Array.isArray(csp)) {
+        headers[name] = csp.map(stripFrameAncestors).filter(Boolean);
+      }
+    }
+
+    // 2) Keep session cookies alive inside the cross-origin iframe.
     const setCookie = proxyRes.headers['set-cookie'];
     if (setCookie) {
       headers['set-cookie'] = (Array.isArray(setCookie) ? setCookie : [setCookie]).map(rewriteCookie);
     }
 
-    // 2) Keep redirects pointed at the proxy, not the real dev server.
+    // 3) Keep redirects pointed at the proxy, not the real dev server.
     const location = proxyRes.headers['location'];
     if (typeof location === 'string') {
       headers['location'] = location.split(target).join(proxyOrigin);
@@ -83,7 +120,7 @@ export async function startProxy(
       return;
     }
 
-    // 3) HTML: buffer, inject the client script, resend.
+    // 4) HTML: buffer, inject the client script, resend.
     const chunks: Buffer[] = [];
     proxyRes.on('data', (chunk) => chunks.push(chunk as Buffer));
     proxyRes.on('error', () => {
@@ -93,10 +130,24 @@ export async function startProxy(
       if (!writable()) {
         return;
       }
-      let body = Buffer.concat(chunks).toString('utf8');
-      const tag = `<script src="${CLIENT_PATH}"></script>`;
-      if (body.includes('</body>')) {
-        body = body.replace('</body>', `${tag}</body>`);
+      // We ask for identity, but some servers compress anyway.
+      const raw = Buffer.concat(chunks);
+      const encoding = String(proxyRes.headers['content-encoding'] || '').toLowerCase();
+      let body: string;
+      try {
+        body = decompress(raw, encoding).toString('utf8');
+        delete headers['content-encoding'];
+      } catch {
+        body = raw.toString('utf8');
+      }
+
+      // Reuse the page's script nonce (if any) so a strict script-src CSP does
+      // not block the injected client.
+      const nonceMatch = body.match(/<script[^>]*\snonce="([^"]+)"/i);
+      const nonceAttr = nonceMatch ? ` nonce="${nonceMatch[1]}"` : '';
+      const tag = `<script${nonceAttr} src="${CLIENT_PATH}"></script>`;
+      if (/<\/body>/i.test(body)) {
+        body = body.replace(/<\/body>/i, `${tag}</body>`);
       } else {
         body += tag;
       }
@@ -149,6 +200,9 @@ export async function startProxy(
 
   // Proxy WebSocket upgrades too (dev servers use them for hot reload).
   server.on('upgrade', (req, socket, head) => {
+    socket.on('error', () => {
+      /* client went away; nothing to do */
+    });
     proxy.ws(req, socket, head, { target });
   });
 
@@ -175,6 +229,28 @@ export async function startProxy(
       }
     }
   };
+}
+
+/** Removes the frame-ancestors directive but keeps the rest of the policy. */
+function stripFrameAncestors(csp: string): string {
+  return csp
+    .split(';')
+    .filter((directive) => !/^\s*frame-ancestors\b/i.test(directive))
+    .join(';')
+    .trim();
+}
+
+function decompress(buf: Buffer, encoding: string): Buffer {
+  switch (encoding) {
+    case 'gzip':
+      return zlib.gunzipSync(buf);
+    case 'deflate':
+      return zlib.inflateSync(buf);
+    case 'br':
+      return zlib.brotliDecompressSync(buf);
+    default:
+      return buf;
+  }
 }
 
 /** Normalizes a user-entered URL to its origin (scheme://host:port). */
