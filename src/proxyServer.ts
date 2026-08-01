@@ -20,6 +20,7 @@
 // The iframe loads this proxy; the proxy forwards to your real dev server.
 
 import * as http from 'http';
+import * as https from 'https';
 import * as fs from 'fs';
 import * as zlib from 'zlib';
 import httpProxy from 'http-proxy';
@@ -31,6 +32,7 @@ export interface ProxyHandle {
 }
 
 const CLIENT_PATH = '/__click-to-source-client.js';
+const HEALTH_PATH = '/__click-to-source-health';
 
 export async function startProxy(
   clientScriptFsPath: string,
@@ -178,6 +180,33 @@ export async function startProxy(
   });
 
   const server = http.createServer((req, res) => {
+    // The panel asks here whether the dev server is up. Checking from Node
+    // avoids every browser restriction (mixed content, CORS) that made the
+    // webview's own fetch unreliable, especially for LAN addresses. The check
+    // also (re)points the proxy at the requested target, so there is no race
+    // between changing the URL and loading the page.
+    if (req.url && req.url.startsWith(HEALTH_PATH)) {
+      const requested = new URL(req.url, 'http://internal').searchParams.get('target');
+      if (requested) {
+        target = toOrigin(requested);
+      }
+      checkTarget(target).then((result) => {
+        if (res.headersSent || res.writableEnded || res.destroyed) {
+          return;
+        }
+        try {
+          res.writeHead(200, {
+            'content-type': 'application/json',
+            'access-control-allow-origin': '*',
+            'cache-control': 'no-store'
+          });
+          res.end(JSON.stringify(result));
+        } catch {
+          /* response already gone */
+        }
+      });
+      return;
+    }
     if (req.url === CLIENT_PATH) {
       // The browser can abort this while the panel reloads; never let a write
       // on a dead response throw "Cannot set headers after they are sent".
@@ -229,6 +258,40 @@ export async function startProxy(
       }
     }
   };
+}
+
+/** Asks the dev server for anything at all, with a short timeout. */
+function checkTarget(origin: string): Promise<{ ok: boolean; error?: string }> {
+  return new Promise((resolve) => {
+    let u: URL;
+    try {
+      u = new URL(origin);
+    } catch {
+      resolve({ ok: false, error: 'invalid target URL' });
+      return;
+    }
+    const get = u.protocol === 'https:' ? https.get : http.get;
+    const req = get(
+      {
+        hostname: u.hostname,
+        port: u.port || (u.protocol === 'https:' ? 443 : 80),
+        path: '/',
+        timeout: 3000,
+        rejectUnauthorized: false
+      },
+      (r) => {
+        r.destroy();
+        resolve({ ok: true });
+      }
+    );
+    req.on('timeout', () => {
+      req.destroy();
+      resolve({ ok: false, error: 'timed out' });
+    });
+    req.on('error', (e: NodeJS.ErrnoException) => {
+      resolve({ ok: false, error: e.code || e.message });
+    });
+  });
 }
 
 /** Removes the frame-ancestors directive but keeps the rest of the policy. */

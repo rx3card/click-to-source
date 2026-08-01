@@ -36,6 +36,14 @@ export function activate(context: vscode.ExtensionContext) {
         proxy = await startProxy(clientPath, devUrl);
       } catch (err) {
         console.error('Click to Source: proxy failed to start, loading directly', err);
+        // Without the proxy the selector cannot work and apps with anti-framing
+        // headers render blank, so this must never fail silently.
+        vscode.window.showWarningMessage(
+          'Click to Source: the helper proxy could not start (' +
+            (err instanceof Error ? err.message : String(err)) +
+            '). The preview will load directly: the selector is unavailable and apps that ' +
+            'send anti-framing headers may show a blank page.'
+        );
       }
     }
 

@@ -4,6 +4,22 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project uses
 [semantic versioning](https://semver.org/).
 
+## [0.2.6] - 2026-07-31
+
+### Added
+- The panel can no longer fail silently. Every failure mode now produces a
+  visible explanation with a next step:
+  - A health endpoint on the proxy checks the dev server from Node, immune to
+    the browser rules (mixed content, CORS) that made the panel's own check
+    unreliable for LAN addresses like 192.168.x.x.
+  - If the page loads but the inspector client never starts, a banner explains
+    why the selector will not work and what to do.
+  - If the proxy is disabled or fails to start, the panel and a VS Code
+    notification say so, including the consequence (blank page for apps with
+    anti-framing headers) and the fix.
+  - The "no server running" message now includes the concrete network error
+    (for example ECONNREFUSED) and keeps retrying automatically.
+
 ## [0.2.5] - 2026-07-31
 
 ### Fixed

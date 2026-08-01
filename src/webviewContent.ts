@@ -50,6 +50,16 @@ export function getWebviewHtml(
     #status { flex: 1 1 100%; min-width: 0; font-size: 11px; opacity: 0.8;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     #status:empty { display: none; }
+    #banner { flex: 0 0 auto; display: flex; align-items: flex-start; gap: 8px;
+      padding: 8px 10px; font-size: 12px; line-height: 1.45;
+      background: var(--vscode-inputValidation-warningBackground, #5d4a12);
+      border-bottom: 1px solid var(--vscode-inputValidation-warningBorder, #a08020);
+      color: var(--vscode-foreground); }
+    #banner[hidden] { display: none; }
+    #banner-msg { flex: 1 1 auto; min-width: 0; }
+    #banner-close { flex: 0 0 auto; padding: 0 8px; background: transparent;
+      color: inherit; font-size: 14px; line-height: 1.2; }
+    #banner-close:hover { background: rgba(255, 255, 255, 0.12); }
     #frameWrap { flex: 1 1 auto; position: relative; min-height: 0; }
     iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: none; background: #fff; }
     #empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
@@ -70,6 +80,10 @@ export function getWebviewHtml(
     <button id="openExternal" title="Open this URL in your default browser (useful for pages behind a login)">Open in browser</button>
     <input id="url" value="${devUrl}" placeholder="http://localhost:3000" />
     <span id="status"></span>
+  </div>
+  <div id="banner" hidden>
+    <span id="banner-msg"></span>
+    <button id="banner-close" title="Dismiss">x</button>
   </div>
   <div id="frameWrap">
     <iframe id="app" src="about:blank"></iframe>
