@@ -91,13 +91,34 @@ export async function startProxy(
   // The dev server must see itself as the caller: Next.js 15+ rejects /_next/*
   // requests from unknown origins, and CSRF checks compare Origin/Referer
   // against Host. Also ask for an uncompressed body so HTML can be injected.
-  const rewriteRequest = (proxyReq: http.ClientRequest) => {
-    proxyReq.setHeader('accept-encoding', 'identity');
+  //
+  // These are built up front and handed to proxy.web/proxy.ws through the
+  // `headers` option, NOT set on the ClientRequest afterwards. http-proxy emits
+  // proxyReq from inside the request's own `socket` event, by which point Node
+  // has already flushed the headers, so setHeader() there throws
+  // ERR_HTTP_HEADERS_SENT - uncaught, inside an emitter, killing the request
+  // before it ever reaches the dev server and leaving the panel blank.
+  const requestHeaders = (req: http.IncomingMessage): { [header: string]: string } => {
+    const headers: { [header: string]: string } = { 'accept-encoding': 'identity' };
     for (const name of ['origin', 'referer'] as const) {
-      const value = proxyReq.getHeader(name);
+      const value = req.headers[name];
       if (typeof value === 'string' && proxyOrigin && value.startsWith(proxyOrigin)) {
-        proxyReq.setHeader(name, value.replace(proxyOrigin, target));
+        headers[name] = value.replace(proxyOrigin, target);
       }
+    }
+    return headers;
+  };
+
+  // Belt and braces: if anything still reaches the request after it was
+  // committed, a failed header rewrite must never take the whole request down.
+  const rewriteRequest = (proxyReq: http.ClientRequest) => {
+    if (proxyReq.headersSent || proxyReq.destroyed) {
+      return;
+    }
+    try {
+      proxyReq.setHeader('accept-encoding', 'identity');
+    } catch {
+      /* already committed; the headers option above covered this */
     }
   };
   proxy.on('proxyReq', rewriteRequest);
@@ -307,7 +328,7 @@ export async function startProxy(
       }
       return;
     }
-    proxy.web(req, res, { target });
+    proxy.web(req, res, { target, headers: requestHeaders(req) });
   });
 
   // Proxy WebSocket upgrades too (dev servers use them for hot reload).
@@ -315,7 +336,7 @@ export async function startProxy(
     socket.on('error', () => {
       /* client went away; nothing to do */
     });
-    proxy.ws(req, socket, head, { target });
+    proxy.ws(req, socket, head, { target, headers: requestHeaders(req) });
   });
 
   await new Promise<void>((resolve) => {

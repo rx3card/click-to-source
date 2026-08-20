@@ -117,6 +117,68 @@
     setTimeout(() => {
       iframe.src = frameUrl;
     }, 0);
+    // Armed here, at navigation time, and not only on the iframe's load event:
+    // when a navigation fails outright the load event never fires at all, and a
+    // watchdog that waits for it would wait forever. That is precisely how the
+    // panel used to sit on "Loading..." showing a white rectangle, looking like
+    // a page that simply had not painted yet. Anything that goes wrong from here
+    // on has to end in a visible explanation.
+    armWatchdog();
+  }
+
+  // Explains, in the panel itself, why nothing is on screen. It asks the proxy
+  // what it sees, because the panel cannot read a cross-origin frame and "white"
+  // on its own says nothing about the cause.
+  function armWatchdog() {
+    clearTimeout(watchdogTimer);
+    watchdogTimer = setTimeout(() => {
+      if (clientReady) {
+        return;
+      }
+      if (!PROXY_URL) {
+        showBanner(
+          'Running without the helper proxy: the selector is unavailable, and apps that send ' +
+            'X-Frame-Options or CSP frame-ancestors headers (most Next.js apps with security headers) ' +
+            'render as a blank page. Enable the clickToSource.proxy setting, then reopen the panel.'
+        );
+        return;
+      }
+      const target = urlInput.value.trim();
+      fetch(PROXY_URL + '/__click-to-source-health?target=' + encodeURIComponent(target) + '&t=' + Date.now(), {
+        cache: 'no-store'
+      })
+        .then((r) => r.json())
+        .then((health) => {
+          if (clientReady) {
+            return;
+          }
+          if (health && health.ok) {
+            showBanner(
+              'Nothing rendered after 10 seconds, even though ' + target + ' is accepting connections. ' +
+                'The request may have failed inside the helper proxy - check the Extension Host log ' +
+                '(Help > Toggle Developer Tools > Console) and press Reload. If it persists, please ' +
+                'report it at github.com/rx3card/click-to-source/issues.'
+            );
+          } else {
+            showBanner(
+              'Nothing rendered: ' + target + ' is not answering (' +
+                ((health && health.error) || 'unknown error') +
+                '). Start your dev server, or correct the URL in the box above.'
+            );
+          }
+          setStatus('');
+        })
+        .catch(() => {
+          if (clientReady) {
+            return;
+          }
+          showBanner(
+            'Nothing rendered, and the helper proxy is not responding either. ' +
+              'Close and reopen the panel to restart it.'
+          );
+          setStatus('');
+        });
+    }, 10000);
   }
 
   function scheduleRetry(url) {
@@ -230,25 +292,7 @@
     // which for a fast page happens before this load event - so without asking
     // again we would forget a client that is right there and warn about it.
     postToApp({ source: 'click-to-source-host', type: 'ping' });
-
-    watchdogTimer = setTimeout(() => {
-      if (clientReady) {
-        return;
-      }
-      if (PROXY_URL) {
-        showBanner(
-          'The page loaded, but the inspector client has not started, so the selector will not work. ' +
-            'Press Reload. If this keeps happening, your app may be serving HTML the proxy cannot inject into - ' +
-            'please report it at github.com/rx3card/click-to-source/issues.'
-        );
-      } else {
-        showBanner(
-          'Running without the helper proxy: the selector is unavailable, and apps that send ' +
-            'X-Frame-Options or CSP frame-ancestors headers (most Next.js apps with security headers) ' +
-            'render as a blank page. Enable the clickToSource.proxy setting, then reopen the panel.'
-        );
-      }
-    }, 7000);
+    armWatchdog();
   });
 
   // Messages coming from the client script inside the iframe (your app).

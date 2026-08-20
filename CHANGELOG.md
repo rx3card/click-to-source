@@ -4,6 +4,27 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project uses
 [semantic versioning](https://semver.org/).
 
+## [0.2.8] - 2026-08-20
+
+### Fixed
+- The panel came up blank inside the real VS Code webview, with the status stuck
+  on "Loading...". The Extension Host log named the cause:
+  `Cannot set headers after they are sent to the client`, thrown from
+  `ClientRequest.setHeader` inside the request's own `socket` event.
+  `http-proxy` emits `proxyReq` from that event, by which point Node has already
+  flushed the request headers, so rewriting them there threw an uncaught error
+  that killed the request before it ever reached the dev server - the dev server
+  logged zero requests. Request headers are now supplied when the request is
+  created, through the `headers` option of `proxy.web`/`proxy.ws`, and the old
+  hook remains only as a guarded fallback.
+- The watchdog is armed when navigation starts instead of on the iframe's `load`
+  event. A navigation that fails outright never fires `load`, so the watchdog
+  never ran and the panel showed a white rectangle with no explanation - the one
+  outcome it is supposed to make impossible. After ten seconds without a page it
+  now asks the proxy what it sees and states the reason: the dev server is not
+  answering and its error, or the server is up and the request failed inside the
+  proxy, with where to look.
+
 ## [0.2.7] - 2026-08-20
 
 ### Fixed
