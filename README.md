@@ -113,6 +113,29 @@ HTML, and server-rendered apps).
 To put the code on GitHub and the extension on the Marketplace, follow
 [docs/PUBLISHING.md](docs/PUBLISHING.md). It covers both, step by step.
 
+The three links you actually need, because they are easy to lose and hard to find
+again:
+
+| What | Link |
+| --- | --- |
+| Create or manage your publisher | [marketplace.visualstudio.com/manage](https://marketplace.visualstudio.com/manage) |
+| List your Azure DevOps organizations | [aex.dev.azure.com/me](https://aex.dev.azure.com/me) |
+| Create or regenerate the token | `https://dev.azure.com/YOUR-ORG/_usersSettings/tokens` |
+
+Replace `YOUR-ORG` with your organization name, which is what the second link shows.
+Do not bookmark plain `dev.azure.com`: with no active session it bounces to the Azure
+product page, not to your account. The token page does not exist at the root either -
+it only lives under an organization.
+
+The token needs exactly two settings, or `vsce` answers `401` when publishing:
+**Organization: All accessible organizations**, and **Scopes: Custom defined -> Show
+all scopes -> Marketplace -> Manage** (Manage, not Acquire or Publish). It is shown
+once and cannot be read back, so a lost token is replaced, never recovered: open the
+token page, either **Regenerate** the old one or create a new one and revoke the old.
+
+Use the same Microsoft account that owns the publisher. Two different accounts is the
+other way to end up with a token that looks fine and fails with `401`.
+
 ---
 
 ## Project structure
