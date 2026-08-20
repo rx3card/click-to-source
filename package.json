@@ -2,7 +2,7 @@
   "name": "click-to-source",
   "displayName": "Click to Source",
   "description": "Preview your running app inside VS Code, click any element, and jump straight to its source code. Works with React/Next, plain HTML/CSS, and server-rendered templates (Flask, Django, PHP, and more).",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "publisher": "rx3card",
   "license": "MIT",
   "author": {
@@ -62,7 +62,7 @@
         "clickToSource.proxy": {
           "type": "boolean",
           "default": true,
-          "description": "Route the preview through a local proxy. The proxy removes anti-framing headers (X-Frame-Options / CSP frame-ancestors) that would otherwise leave the panel blank, keeps session cookies working, and auto-injects the inspector client into any project. Turn it off only if you inject the client script yourself."
+          "description": "Route the preview through a local proxy. The proxy removes anti-framing headers (X-Frame-Options / CSP frame-ancestors) that would otherwise leave the panel blank, keeps session cookies working, and auto-injects the inspector client into any project. Turn it off only if you inject the client script yourself. Note that a CSP of frame-ancestors 'self' in your app is not enough for the panel: the webview is its own origin, so the proxy is what makes framing work."
         }
       }
     }

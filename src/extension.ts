@@ -61,11 +61,18 @@ export function activate(context: vscode.ExtensionContext) {
     // Icon shown on the panel's editor tab.
     panel.iconPath = vscode.Uri.joinPath(context.extensionUri, 'assets', 'icon.png');
 
+    // The webview runs on the client machine, which is not always the machine
+    // the extension runs on (Remote SSH, WSL, Codespaces, dev containers). There
+    // a bare 127.0.0.1 URL points at the wrong computer and the frame comes up
+    // blank, so the local address is translated into one the webview can really
+    // reach. Locally this returns the same URL untouched.
+    const panelProxyUrl = proxy ? await toWebviewReachableUrl(proxy.url) : '';
+
     panel.webview.html = getWebviewHtml(
       panel.webview,
       context.extensionUri,
       devUrl,
-      proxy?.url ?? ''
+      panelProxyUrl
     );
 
     panel.webview.onDidReceiveMessage(
@@ -107,6 +114,20 @@ export function activate(context: vscode.ExtensionContext) {
   statusItem.command = 'clickToSource.open';
   statusItem.show();
   context.subscriptions.push(statusItem);
+}
+
+/**
+ * Turns a URL that is local to the extension host into one the webview can load.
+ * On a plain desktop install both are the same machine and the URL comes back
+ * unchanged; under Remote/WSL/Codespaces this is what sets up the port forward.
+ */
+async function toWebviewReachableUrl(url: string): Promise<string> {
+  try {
+    const external = await vscode.env.asExternalUri(vscode.Uri.parse(url));
+    return external.toString().replace(/\/+$/, '');
+  } catch {
+    return url;
+  }
 }
 
 /** Tries each candidate strategy in order; opens the first that resolves. */

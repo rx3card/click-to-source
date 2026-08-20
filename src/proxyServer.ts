@@ -6,7 +6,9 @@
 //   1. Framing: many apps (and most Next.js starters with security headers) send
 //      X-Frame-Options or a CSP with frame-ancestors, which makes the browser
 //      silently refuse to render the page inside the panel's iframe. The proxy
-//      removes those directives so the preview always renders.
+//      removes those directives so the preview always renders. Note that a CSP
+//      of `frame-ancestors 'self'` is not enough for the panel: the webview runs
+//      on the vscode-webview: origin, so it is never "self".
 //   2. Cookies: the panel embeds your app in a cross-origin iframe, where the
 //      browser treats SameSite=Strict/Lax session cookies as third-party and
 //      drops them (logging you out). The proxy rewrites every Set-Cookie to
@@ -16,11 +18,14 @@
 //      Referer so the dev server sees itself as the caller.
 //   4. Client script: it injects the inspector client into every HTML response,
 //      so you don't have to copy any file into your project.
+//   5. Waiting room: when the dev server is not up yet, a document request gets
+//      a self-refreshing "waiting" page instead of a dead frame, so the panel is
+//      never blank and the app appears on its own once the server starts.
 //
 // The iframe loads this proxy; the proxy forwards to your real dev server.
 
 import * as http from 'http';
-import * as https from 'https';
+import * as net from 'net';
 import * as fs from 'fs';
 import * as zlib from 'zlib';
 import httpProxy from 'http-proxy';
@@ -33,6 +38,39 @@ export interface ProxyHandle {
 
 const CLIENT_PATH = '/__click-to-source-client.js';
 const HEALTH_PATH = '/__click-to-source-health';
+
+// Headers that describe a single hop and must never be copied to the next one.
+// Forwarding `connection: close` in particular makes the browser tear down and
+// redial a socket for every asset, which is slow and flaky on a dev server that
+// serves hundreds of chunks.
+const HOP_BY_HOP = [
+  'connection',
+  'keep-alive',
+  'proxy-authenticate',
+  'proxy-authorization',
+  'te',
+  'trailer',
+  'transfer-encoding',
+  'upgrade'
+];
+
+// Only these encodings can be safely decoded before injecting the client. An
+// encoding we don't understand (zstd on older Node, or a chain like "gzip, br")
+// means the body must be left completely alone: rewriting it would ship
+// compressed bytes labelled as text, which renders as a blank page.
+type Decoder = (buf: Buffer) => Buffer;
+const DECODERS: Record<string, Decoder> = {
+  '': (buf) => buf,
+  identity: (buf) => buf,
+  gzip: (buf) => zlib.gunzipSync(buf),
+  'x-gzip': (buf) => zlib.gunzipSync(buf),
+  deflate: (buf) => zlib.inflateSync(buf),
+  br: (buf) => zlib.brotliDecompressSync(buf)
+};
+const zstdDecompressSync = (zlib as unknown as { zstdDecompressSync?: Decoder }).zstdDecompressSync;
+if (typeof zstdDecompressSync === 'function') {
+  DECODERS.zstd = (buf) => zstdDecompressSync(buf);
+}
 
 export async function startProxy(
   clientScriptFsPath: string,
@@ -68,11 +106,12 @@ export async function startProxy(
   proxy.on('proxyRes', (proxyRes, _req, res) => {
     const headers: http.OutgoingHttpHeaders = { ...proxyRes.headers };
 
-    // The upstream body is already de-chunked by Node's HTTP client, so we must
-    // never forward the upstream transfer-encoding. Node re-applies framing on
-    // its own when we pipe or send a buffer. Keeping it corrupts JS/CSS chunks
-    // and leaves the page blank.
-    delete headers['transfer-encoding'];
+    // The upstream body is already de-chunked by Node's HTTP client, and
+    // per-hop headers belong to the upstream connection only. Node re-applies
+    // framing on its own when we pipe or send a buffer.
+    for (const name of HOP_BY_HOP) {
+      delete headers[name];
+    }
 
     // 1) Let the page render inside the panel's iframe. Without this, apps that
     // send X-Frame-Options or CSP frame-ancestors show up as a blank frame.
@@ -106,19 +145,30 @@ export async function startProxy(
     // The browser often aborts requests when the panel reloads. Guard every
     // write so a dead response never throws "Cannot set headers after sent".
     const writable = () => !res.headersSent && !res.writableEnded && !res.destroyed;
+    const status = proxyRes.statusCode || 200;
 
-    const contentType = String(proxyRes.headers['content-type'] || '');
-    if (!contentType.includes('text/html')) {
+    // Streams the upstream body through untouched. Used for every response that
+    // must not be rewritten: non-HTML, bodiless statuses, and any HTML whose
+    // encoding cannot be safely decoded.
+    const passThrough = () => {
       if (!writable()) {
         proxyRes.destroy();
         return;
       }
       try {
-        res.writeHead(proxyRes.statusCode || 200, headers);
+        res.writeHead(status, headers);
         proxyRes.pipe(res);
       } catch {
         proxyRes.destroy();
       }
+    };
+
+    const contentType = String(proxyRes.headers['content-type'] || '');
+    // 304/204/205 carry no body: injecting one would produce a response whose
+    // content-length lies about a body the browser must not read.
+    const bodiless = status === 204 || status === 205 || status === 304;
+    if (bodiless || !contentType.includes('text/html')) {
+      passThrough();
       return;
     }
 
@@ -134,14 +184,34 @@ export async function startProxy(
       }
       // We ask for identity, but some servers compress anyway.
       const raw = Buffer.concat(chunks);
-      const encoding = String(proxyRes.headers['content-encoding'] || '').toLowerCase();
-      let body: string;
-      try {
-        body = decompress(raw, encoding).toString('utf8');
-        delete headers['content-encoding'];
-      } catch {
-        body = raw.toString('utf8');
+      const encoding = String(proxyRes.headers['content-encoding'] || '')
+        .trim()
+        .toLowerCase();
+      const decoder = DECODERS[encoding];
+      let decoded: Buffer | null = null;
+      if (decoder) {
+        try {
+          decoded = decoder(raw);
+        } catch {
+          decoded = null;
+        }
       }
+
+      // An encoding we cannot decode (or that fails to decode) means the body
+      // must go out exactly as it came in, headers included. Mangling it here is
+      // what turns a working app into a blank page.
+      if (!decoded) {
+        try {
+          res.writeHead(status, headers);
+          res.end(raw);
+        } catch {
+          /* response already gone */
+        }
+        return;
+      }
+
+      let body = decoded.toString('utf8');
+      delete headers['content-encoding'];
 
       // Reuse the page's script nonce (if any) so a strict script-src CSP does
       // not block the injected client.
@@ -154,12 +224,10 @@ export async function startProxy(
         body += tag;
       }
       const buf = Buffer.from(body, 'utf8');
-      // We send a full buffer, so replace any streaming/length headers.
-      delete headers['transfer-encoding'];
-      delete headers['content-length'];
+      // We send a full buffer, so the length must describe what is actually sent.
       headers['content-length'] = String(buf.length);
       try {
-        res.writeHead(proxyRes.statusCode || 200, headers);
+        res.writeHead(status, headers);
         res.end(buf);
       } catch {
         /* response already gone */
@@ -167,15 +235,30 @@ export async function startProxy(
     });
   });
 
-  proxy.on('error', (_err, _req, res) => {
+  proxy.on('error', (err, req, res) => {
     const r = res as http.ServerResponse;
-    if (r && typeof r.writeHead === 'function' && !r.headersSent && !r.writableEnded && !r.destroyed) {
-      try {
+    if (!r || typeof r.writeHead !== 'function' || r.headersSent || r.writableEnded || r.destroyed) {
+      return;
+    }
+    const code = (err as NodeJS.ErrnoException).code || err.message;
+    try {
+      // A document request gets a real page instead of a dead frame, so the
+      // panel is never blank and the app shows up by itself once the server is
+      // running. Assets still get a plain 502.
+      if (wantsHtml(req as http.IncomingMessage)) {
+        const page = waitingPage(target, code);
+        r.writeHead(200, {
+          'content-type': 'text/html; charset=utf-8',
+          'cache-control': 'no-store',
+          'content-length': String(Buffer.byteLength(page))
+        });
+        r.end(page);
+      } else {
         r.writeHead(502, { 'content-type': 'text/plain' });
-        r.end('Click to Source proxy: the dev server did not respond.');
-      } catch {
-        /* ignore */
+        r.end('Click to Source proxy: the dev server did not respond (' + code + ').');
       }
+    } catch {
+      /* ignore */
     }
   });
 
@@ -260,7 +343,15 @@ export async function startProxy(
   };
 }
 
-/** Asks the dev server for anything at all, with a short timeout. */
+/**
+ * Answers one question only: is something listening on that host and port?
+ *
+ * It deliberately does not fetch a page. A dev server that is up but still
+ * compiling (Next.js with Turbopack routinely needs ten seconds or more for the
+ * first request) would fail a short HTTP probe, and every abandoned probe throws
+ * away work the server had already done. A TCP connect answers instantly and
+ * costs the dev server nothing; whether the page renders is the iframe's job.
+ */
 function checkTarget(origin: string): Promise<{ ok: boolean; error?: string }> {
   return new Promise((resolve) => {
     let u: URL;
@@ -270,28 +361,69 @@ function checkTarget(origin: string): Promise<{ ok: boolean; error?: string }> {
       resolve({ ok: false, error: 'invalid target URL' });
       return;
     }
-    const get = u.protocol === 'https:' ? https.get : http.get;
-    const req = get(
-      {
-        hostname: u.hostname,
-        port: u.port || (u.protocol === 'https:' ? 443 : 80),
-        path: '/',
-        timeout: 3000,
-        rejectUnauthorized: false
-      },
-      (r) => {
-        r.destroy();
-        resolve({ ok: true });
+    const port = Number(u.port || (u.protocol === 'https:' ? 443 : 80));
+    let settled = false;
+    const done = (result: { ok: boolean; error?: string }) => {
+      if (settled) {
+        return;
       }
-    );
-    req.on('timeout', () => {
-      req.destroy();
-      resolve({ ok: false, error: 'timed out' });
-    });
-    req.on('error', (e: NodeJS.ErrnoException) => {
-      resolve({ ok: false, error: e.code || e.message });
-    });
+      settled = true;
+      socket.destroy();
+      resolve(result);
+    };
+    const socket = net.connect({ host: u.hostname, port });
+    socket.setTimeout(2000);
+    socket.on('connect', () => done({ ok: true }));
+    socket.on('timeout', () => done({ ok: false, error: 'timed out' }));
+    socket.on('error', (e: NodeJS.ErrnoException) => done({ ok: false, error: e.code || e.message }));
   });
+}
+
+/** True when the request is for a page, not for an asset or an XHR. */
+function wantsHtml(req: http.IncomingMessage): boolean {
+  const dest = String(req.headers['sec-fetch-dest'] || '');
+  if (dest) {
+    return dest === 'document' || dest === 'iframe';
+  }
+  return String(req.headers['accept'] || '').includes('text/html');
+}
+
+/** Shown inside the iframe while the dev server is not answering. */
+function waitingPage(target: string, code: string): string {
+  const safeTarget = escapeHtml(target);
+  const safeCode = escapeHtml(code);
+  return `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8" />
+<meta http-equiv="refresh" content="3" />
+<title>Waiting for ${safeTarget}</title>
+<style>
+  body { margin: 0; height: 100vh; display: flex; align-items: center; justify-content: center;
+    font-family: system-ui, sans-serif; background: #1e1e1e; color: #dddddd;
+    text-align: center; padding: 24px; }
+  .card { max-width: 420px; }
+  h1 { font-size: 19px; margin: 0 0 12px; }
+  p { font-size: 13px; line-height: 1.6; opacity: 0.8; margin: 6px 0; }
+  code { background: #2b2b2b; padding: 2px 6px; border-radius: 4px; }
+</style></head>
+<body><div class="card">
+  <h1>Waiting for your dev server</h1>
+  <p>Nothing is answering at <code>${safeTarget}</code> yet (<code>${safeCode}</code>).</p>
+  <p>Start it, and this page will load your app by itself.</p>
+</div>
+<script>
+  // Tells the panel this is the waiting room, not your app, so its "the
+  // inspector client never started" watchdog stays quiet while we wait.
+  try { parent.postMessage({ source: 'click-to-source-client', type: 'waiting' }, '*'); } catch (e) {}
+</script>
+</body></html>`;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 /** Removes the frame-ancestors directive but keeps the rest of the policy. */
@@ -301,19 +433,6 @@ function stripFrameAncestors(csp: string): string {
     .filter((directive) => !/^\s*frame-ancestors\b/i.test(directive))
     .join(';')
     .trim();
-}
-
-function decompress(buf: Buffer, encoding: string): Buffer {
-  switch (encoding) {
-    case 'gzip':
-      return zlib.gunzipSync(buf);
-    case 'deflate':
-      return zlib.inflateSync(buf);
-    case 'br':
-      return zlib.brotliDecompressSync(buf);
-    default:
-      return buf;
-  }
 }
 
 /** Normalizes a user-entered URL to its origin (scheme://host:port). */

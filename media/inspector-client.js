@@ -369,6 +369,12 @@
     }
     if (data.type === 'toggle') {
       setEnabled(!!data.enabled);
+    } else if (data.type === 'ping') {
+      // The panel is asking whether a client is alive in this document. Our
+      // one-shot "ready" below is often sent before the panel's load handler
+      // runs, so without this answer the panel would wrongly conclude that the
+      // client never started and warn about it on a page that works.
+      send({ type: 'ready' });
     }
   });
 

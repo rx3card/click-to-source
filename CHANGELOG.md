@@ -4,6 +4,44 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project uses
 [semantic versioning](https://semver.org/).
 
+## [0.2.7] - 2026-08-20
+
+### Fixed
+- Blank panel that never resolved. The panel refused to show the frame until a
+  health probe answered, and that probe gave the dev server only 3 seconds to
+  render `/`. A cold Next.js/Turbopack build was measured at 9.4s on a real
+  project, so the probe timed out, the frame was forced back to `about:blank`,
+  and the retry loop re-probed every 3 seconds forever - each abandoned probe
+  throwing away the compile work the server had just done. The frame is now
+  loaded first and the health endpoint only describes what is happening.
+- The health check no longer fetches a page. It opens a TCP connection, which
+  answers in milliseconds, cannot time out on a slow first build, and costs the
+  dev server nothing.
+- Corrupted responses turning into a blank page. A `content-encoding` the proxy
+  could not decode (`zstd`, or a chain such as `gzip, br`) had its header
+  stripped while the body stayed compressed, and a decode failure kept the header
+  while the body was mangled through a UTF-8 round trip. Bodies that cannot be
+  safely decoded are now passed through byte for byte, headers included.
+- `304`, `204` and `205` responses no longer get a script tag and a
+  `content-length` describing a body the browser must not read.
+- Hop-by-hop headers (`connection`, `keep-alive`, `upgrade`, ...) are no longer
+  copied from the dev server, so the browser stops redialling a socket per asset.
+- A path in `clickToSource.devServerUrl` is no longer discarded:
+  `localhost:3000/dashboard` opens the dashboard instead of the site root.
+- The "the inspector client has not started" warning no longer appears on a page
+  that works. The client announces itself once, often before the panel's load
+  handler runs, so the panel now asks it to identify itself and the client
+  answers.
+
+### Added
+- A waiting page. When nothing answers, document requests get a self-refreshing
+  page that names the address and the error, and the app appears on its own once
+  the server is up - no clicking Retry, and never an unexplained blank frame.
+- Remote support. The proxy address is resolved through `vscode.env.asExternalUri`,
+  so the preview also works over Remote SSH, WSL, dev containers and Codespaces,
+  where the webview runs on a different machine than the extension and a bare
+  `127.0.0.1` pointed at the wrong computer.
+
 ## [0.2.6] - 2026-07-31
 
 ### Added
